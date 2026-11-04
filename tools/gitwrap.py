@@ -58,3 +58,9 @@ def current_branch(repo: Path) -> str:
 def tracked_paths(repo: Path) -> list[str]:
     """Return every path in the index, sorted as ``git ls-files`` reports it."""
     return [line for line in git(repo, "ls-files").splitlines() if line]
+
+
+def head_paths(repo: Path) -> list[str]:
+    """Return every path in the ``HEAD`` commit; empty when there is no commit yet."""
+    listing = git(repo, "ls-tree", "-r", "--name-only", "HEAD", check=False)
+    return [line for line in listing.splitlines() if line]

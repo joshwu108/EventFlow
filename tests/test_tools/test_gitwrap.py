@@ -5,7 +5,14 @@ from pathlib import Path
 import pytest
 
 from tests.conftest import IDENTITY_EMAIL, IDENTITY_NAME, run_git
-from tools.gitwrap import GitError, current_branch, git, local_identity, tracked_paths
+from tools.gitwrap import (
+    GitError,
+    current_branch,
+    git,
+    head_paths,
+    local_identity,
+    tracked_paths,
+)
 
 
 def test_git_returns_stripped_stdout(repo: Path) -> None:
@@ -46,3 +53,10 @@ def test_current_branch_names_the_checked_out_branch(repo: Path) -> None:
 
 def test_tracked_paths_lists_the_index(repo: Path) -> None:
     assert tracked_paths(repo) == [".gitignore", "README.rst"]
+
+
+def test_head_paths_lists_the_last_commit_even_after_git_rm(repo: Path) -> None:
+    run_git(repo, "rm", "-q", "README.rst")
+
+    assert head_paths(repo) == [".gitignore", "README.rst"]
+    assert tracked_paths(repo) == [".gitignore"]
