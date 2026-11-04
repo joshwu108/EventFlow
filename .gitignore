@@ -47,6 +47,19 @@ env/
 htmlcov/
 coverage.xml
 
+# Datasets: downloaded or generated data is never committed (licence and size).
+data/
+*.zip
+*.npy
+*.parquet
+*.feather
+*.csv
+*.csv.gz
+
+# Exception: small committed test fixtures. tools/paths.py caps their size.
+!tests/fixtures/
+!tests/fixtures/**
+
 # Editor / OS
 .DS_Store
 .idea/
