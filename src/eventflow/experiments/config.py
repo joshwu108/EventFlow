@@ -38,6 +38,7 @@ class LobsterDaySpec:
     instrument: str
     message: str
     orderbook: str | None = None
+    day_index: int | None = None
 
 
 @dataclass(frozen=True)

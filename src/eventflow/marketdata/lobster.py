@@ -73,6 +73,10 @@ class LobsterDay:
     message_path: Path
     orderbook_path: Path | None = None
     name: str | None = None
+    day_index: int | None = None
+
+
+SECONDS_PER_DAY = 86_400.0
 
 
 def _load_matrix(path: Path, min_columns: int) -> np.ndarray:
@@ -95,6 +99,13 @@ def read_lobster(
 
     ``tick_size`` is in dollars. Halt indicator rows (type 7) carry no order
     information and are dropped by default.
+
+    Timestamps stay seconds after midnight (full precision); each session's
+    ``clock_offset`` is ``86400 * day_index`` so that chronological splits
+    order days correctly. ``day_index`` defaults to the position in
+    ``days``, which is only correct for one instrument listed in date order;
+    with several instruments per date, set ``day_index`` explicitly so that
+    sessions of the same date share an offset.
     """
     if not days:
         raise SchemaError("read_lobster needs at least one LobsterDay")
@@ -160,6 +171,11 @@ def read_lobster(
         if np.any(~np.isin(direction, (1.0, -1.0))):
             raise SchemaError(f"{day.message_path}: direction must be 1 or -1")
         n = messages.shape[0]
+        # LOBSTER times are seconds after midnight with no date. The day offset
+        # goes into SessionInfo.clock_offset (used to order sessions) instead of
+        # the timestamps, which would lose nanosecond resolution over long spans.
+        day_number = index if day.day_index is None else day.day_index
+        offset = day_number * SECONDS_PER_DAY
         pieces["timestamp"].append(messages[:, 0])
         pieces["instrument"].append(np.full(n, instruments.index(day.instrument)))
         pieces["event_type"].append(types - 1)
@@ -169,7 +185,9 @@ def read_lobster(
         pieces["session"].append(np.full(n, index))
         name = day.name or f"{day.instrument}/{day.message_path.stem}"
         open_time = float(messages[0, 0]) if n else None
-        sessions.append(SessionInfo(index, instruments.index(day.instrument), name, open_time))
+        sessions.append(
+            SessionInfo(index, instruments.index(day.instrument), name, open_time, offset)
+        )
 
     def cat(key: str) -> np.ndarray:
         return np.concatenate(pieces[key])

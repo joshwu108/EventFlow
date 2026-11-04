@@ -125,6 +125,11 @@ class SessionInfo:
     instrument: int
     name: str
     open_time: float | None = None
+    # Seconds added to this session's timestamps to place it on a dataset-wide
+    # clock. Sources whose timestamps restart every day (LOBSTER: seconds after
+    # midnight) set it to the day's offset; it is used only to order sessions in
+    # chronological splits, so raw timestamps keep their full precision.
+    clock_offset: float = 0.0
 
 
 def _readonly(array: np.ndarray) -> np.ndarray:
@@ -328,6 +333,14 @@ class EventFrame:
             raise TypeError(f"unknown fields: {sorted(unknown)}")
         kwargs.update(changes)
         return EventFrame.from_columns(**kwargs)
+
+    def global_time(self) -> np.ndarray:
+        """``timestamp + clock_offset`` of each row's session (dataset-wide clock)."""
+        offsets = {info.session: info.clock_offset for info in self.sessions}
+        if not any(offsets.values()):
+            return self.timestamp
+        lookup = np.array([offsets.get(s, 0.0) for s in range(int(self.session.max()) + 1)])
+        return self.timestamp + lookup[self.session]
 
     def session_bounds(self) -> list[tuple[int, int]]:
         """``[start, stop)`` row ranges of each contiguous session block."""

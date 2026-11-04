@@ -69,7 +69,12 @@ class PreprocessResult:
 def _renumber_sessions(
     frame: EventFrame, new_session: np.ndarray, names: dict[int, str]
 ) -> EventFrame:
-    """Re-index sessions to 0..k-1 in order of appearance, keeping metadata."""
+    """Re-index sessions to 0..k-1 in order of appearance, keeping metadata.
+
+    Each new session inherits the ``clock_offset`` of the original session of
+    its first row.
+    """
+    offsets = {info.session: info.clock_offset for info in frame.sessions}
     _, first = np.unique(new_session, return_index=True)
     order = new_session[np.sort(first)]
     lookup = {int(s): i for i, s in enumerate(order)}
@@ -83,6 +88,7 @@ def _renumber_sessions(
                 int(frame.instrument[row]),
                 names.get(old, f"session{old}"),
                 float(frame.timestamp[row]),
+                offsets.get(int(frame.session[row]), 0.0),
             )
         )
     return frame.replace(session=session, sessions=tuple(infos))
@@ -211,7 +217,8 @@ def chronological_split(frame: EventFrame, cfg: SplitConfig | None = None) -> Pa
     cfg = cfg or SplitConfig()
     if cfg.unit == "session":
         bounds = frame.session_bounds()
-        opens = np.array([frame.timestamp[a] for a, _ in bounds])
+        clock = frame.global_time()
+        opens = np.array([clock[a] for a, _ in bounds])
         sizes = np.array([b - a for a, b in bounds], dtype=np.float64)
         order = np.argsort(opens, kind="stable")
         cumulative = np.cumsum(sizes[order]) / sizes.sum()
@@ -224,11 +231,12 @@ def chronological_split(frame: EventFrame, cfg: SplitConfig | None = None) -> Pa
         row_label = np.repeat(labels, sizes.astype(np.int64))
         keep = np.ones(len(frame), dtype=bool)
     else:
-        cut1, cut2 = np.quantile(frame.timestamp, [cfg.train, cfg.train + cfg.validation])
-        row_label = np.searchsorted([cut1, cut2], frame.timestamp, side="right")
+        clock = frame.global_time()
+        cut1, cut2 = np.quantile(clock, [cfg.train, cfg.train + cfg.validation])
+        row_label = np.searchsorted([cut1, cut2], clock, side="right")
         keep = ~(
-            ((frame.timestamp > cut1) & (frame.timestamp <= cut1 + cfg.embargo))
-            | ((frame.timestamp > cut2) & (frame.timestamp <= cut2 + cfg.embargo))
+            ((clock > cut1) & (clock <= cut1 + cfg.embargo))
+            | ((clock > cut2) & (clock <= cut2 + cfg.embargo))
         )
         # Rows on either side of a cut in the same original session become separate sessions.
         new_session = frame.session.astype(np.int64) * 3 + row_label
