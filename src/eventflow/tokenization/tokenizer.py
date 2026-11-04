@@ -154,6 +154,9 @@ class EventTokenizer:
     integer_quantities: bool
     min_quantity: float
     time_scale: float
+    # Smallest positive training gap: the floor for generated non-zero gaps, so
+    # they never collapse to zero when added to large timestamps.
+    min_positive_gap: float = 0.0
 
     # ------------------------------------------------------------------ fitting
     @classmethod
@@ -229,6 +232,7 @@ class EventTokenizer:
             integer,
             float(quantities.min()) if quantities.size else 1.0,
             time_scale,
+            float(gap[positive].min()) if positive.any() else 0.0,
         )
 
     # ----------------------------------------------------------------- encoding
@@ -328,7 +332,7 @@ class EventTokenizer:
         * quantities are positive, rounded to whole units when training
           quantities were integral, and at least the smallest training size;
         * interarrival times are exactly zero when ``zero_gap`` is set and
-          strictly positive otherwise.
+          at least the smallest positive training gap otherwise.
 
         Events that remain invalid (non-finite values, out-of-range codes or
         categorical combinations never observed in training) are flagged in
@@ -378,9 +382,10 @@ class EventTokenizer:
         k = self.layout.cont_index(LOG_GAP)
         gap = np.exp(self.standardizers[LOG_GAP].inverse(clipped[:, k], groups))
         floor = max(self.config.zero_gap_threshold, 0.0)
-        not_above = (~zero) & (gap <= floor)
+        smallest = max(self.min_positive_gap, float(np.nextafter(floor, np.inf)))
+        not_above = (~zero) & (gap < smallest)
         corrections["gap_floor"] = int(not_above.sum())
-        gap = np.where(not_above, np.nextafter(floor, np.inf), gap)
+        gap = np.where(not_above, smallest, gap)
         gap = np.where(zero, 0.0, gap)
         return DecodedEvents(
             event_type=etype,
@@ -411,6 +416,7 @@ class EventTokenizer:
             "integer_quantities": self.integer_quantities,
             "min_quantity": self.min_quantity,
             "time_scale": self.time_scale,
+            "min_positive_gap": self.min_positive_gap,
         }
 
     @classmethod
@@ -432,6 +438,7 @@ class EventTokenizer:
             integer_quantities=bool(data["integer_quantities"]),
             min_quantity=float(data["min_quantity"]),
             time_scale=float(data["time_scale"]),
+            min_positive_gap=float(data.get("min_positive_gap", 0.0)),
         )
 
     def to_json(self) -> str:
