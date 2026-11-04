@@ -13,7 +13,7 @@ def test_git_returns_stripped_stdout(repo: Path) -> None:
 
 
 def test_git_raises_with_stderr_on_failure(repo: Path) -> None:
-    with pytest.raises(GitError, match="unknown revision|bad revision"):
+    with pytest.raises(GitError, match="failed:\\nfatal:"):
         git(repo, "rev-parse", "--verify", "no-such-ref^{commit}")
 
 
