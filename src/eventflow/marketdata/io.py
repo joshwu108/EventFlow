@@ -147,7 +147,8 @@ def frame_from_table(
     instrument, instruments = _index(table[cols.instrument], None)
     etype, vocab = _index(table[cols.event_type], event_types)
     capabilities = {Capability.TIMESTAMPS}
-    if len(vocab) > 1:
+    # A declared vocabulary is not evidence of multiple event types; observed codes are.
+    if np.unique(etype).size > 1:
         capabilities.add(Capability.MULTI_EVENT_TYPE)
     if message_level:
         capabilities.add(Capability.MESSAGE_LEVEL)
