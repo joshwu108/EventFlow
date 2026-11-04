@@ -54,13 +54,13 @@ from eventflow.training.runlog import MetricLogger, RunManifest
 
 
 def build_optimizer(model: nn.Module, cfg: TrainConfig) -> torch.optim.Optimizer:
-    """AdamW/Adam/SGD; weight decay is not applied to biases, norms or embeddings."""
+    """AdamW/Adam/SGD with weight decay on ``nn.Linear`` weights only."""
+    # Classify by owning module type, not by name: only nn.Linear weights decay.
+    decay_ids = {id(module.weight) for module in model.modules() if isinstance(module, nn.Linear)}
     decay, no_decay = [], []
-    for name, param in model.named_parameters():
-        if not param.requires_grad:
-            continue
-        is_matrix = param.dim() >= 2 and "embedding" not in name and "position" not in name
-        (decay if is_matrix else no_decay).append(param)
+    for param in model.parameters():
+        if param.requires_grad:
+            (decay if id(param) in decay_ids else no_decay).append(param)
     groups = [
         {"params": decay, "weight_decay": cfg.weight_decay},
         {"params": no_decay, "weight_decay": 0.0},
@@ -126,6 +126,7 @@ class Trainer:
         use_scaler = config.precision == "fp16" and self.device.type == "cuda"
         self.scaler = torch.amp.GradScaler("cuda", enabled=use_scaler)
         self.step = 0
+        self.batches_consumed = 0
         self.best_validation: float | None = None
         self.evals_without_improvement = 0
         self.nonfinite_streak = 0
@@ -198,6 +199,7 @@ class Trainer:
     def _payload(self) -> dict[str, Any]:
         return {
             "step": self.step,
+            "batches_consumed": self.batches_consumed,
             "model": self.model.state_dict(),
             "optimizer": self.optimizer.state_dict(),
             "scheduler": self.scheduler.state_dict(),
@@ -233,28 +235,45 @@ class Trainer:
             ) from exc
         restore_rng_state(payload["rng"])
         self.step = int(payload["step"])
+        self.batches_consumed = int(payload.get("batches_consumed", self.step))
         self.best_validation = payload["best_validation"]
         self.evals_without_improvement = int(payload["evals_without_improvement"])
         self.manifest.update(resumed_from=str(path), resumed_step=self.step)
+        return True
+
+    def restore_best(self) -> bool:
+        """Load ``best.pt`` model weights (if present) for evaluation; returns success."""
+        path = self.checkpoint_dir / "best.pt"
+        if not path.is_file():
+            return False
+        self.model.load_state_dict(load_checkpoint(path, map_location=self.device)["model"])
         return True
 
     # -------------------------------------------------------------- training
     def _train_step(self, batches: Iterator[EventBatch]) -> dict[str, float] | None:
         cfg = self.config
         self.optimizer.zero_grad(set_to_none=True)
-        components: dict[str, float] = {}
+        weighted: dict[str, float] = {}
         targets = 0
+        reference: int | None = None
         finite = True
         for _ in range(cfg.grad_accumulation):
             batch = next(batches).to(self.device)
+            self.batches_consumed += 1
             with self._autocast():
                 out = self.model.loss(batch)
             if not torch.isfinite(out.total):
                 finite = False
                 break
-            self.scaler.scale(out.total / cfg.grad_accumulation).backward()
+            # Micro-batch losses are per-target means. Weighting each by its
+            # target count (relative to the first micro-batch, to keep loss
+            # magnitudes near 1 under fp16 loss scaling) and rescaling the
+            # summed gradients below makes accumulation equal to one large
+            # batch even when windows are padded or short.
+            reference = reference or max(out.num_targets, 1)
+            self.scaler.scale(out.total * (out.num_targets / reference)).backward()
             for key, value in out.components.items():
-                components[key] = components.get(key, 0.0) + value / cfg.grad_accumulation
+                weighted[key] = weighted.get(key, 0.0) + value * out.num_targets
             targets += out.num_targets
         if not finite:
             self.optimizer.zero_grad(set_to_none=True)
@@ -265,6 +284,12 @@ class Trainer:
                 )
             return None
         self.nonfinite_streak = 0
+        if targets and reference is not None and targets != reference:
+            factor = reference / targets
+            for param in self.model.parameters():
+                if param.grad is not None:
+                    param.grad.mul_(factor)
+        components = {k: v / max(targets, 1) for k, v in weighted.items()}
         self.scaler.unscale_(self.optimizer)
         grad_norm = (
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), cfg.grad_clip)
@@ -307,8 +332,9 @@ class Trainer:
         self.manifest.update(status="running")
         self.model.train()
         batches = self._batches()
-        # Fast-forward the data stream so a resumed run does not replay batches.
-        for _ in range(self.step * cfg.grad_accumulation):
+        # Fast-forward the data stream so a resumed run does not replay batches
+        # (counts batches, not steps: skipped non-finite steps also consume data).
+        for _ in range(self.batches_consumed):
             next(batches)
         status = "completed"
         try:
