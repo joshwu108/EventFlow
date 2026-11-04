@@ -207,6 +207,7 @@ def one_step_samples(
     *,
     seed: int = 0,
     temperature: float = 1.0,
+    device: torch.device | str = "cpu",
 ) -> tuple[DecodedEvents, DecodedEvents]:
     """One generated next event per real context, plus the real next event.
 
@@ -217,8 +218,8 @@ def one_step_samples(
     assert prompts.continuation is not None
     if hasattr(model, "eval"):
         model.eval()
-    generator = torch.Generator().manual_seed(seed)
-    nxt = model.sample_next(prompts.context, generator, temperature)
+    generator = torch.Generator(device=device).manual_seed(seed)
+    nxt = model.sample_next(prompts.context.to(device), generator, temperature)
     inst = prompts.context.instrument.cpu().numpy()
     fake = tokenizer.decode(nxt.categorical.cpu().numpy(), nxt.continuous.cpu().numpy(), inst)
     real = tokenizer.decode(prompts.continuation.categorical, prompts.continuation.continuous, inst)

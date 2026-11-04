@@ -59,7 +59,12 @@ def load_frame(cfg: ExperimentConfig) -> EventFrame:
             data.path, event_types=data.event_types, message_level=data.message_level
         )
     days = [
-        LobsterDay(d.instrument, Path(d.message), Path(d.orderbook) if d.orderbook else None)
+        LobsterDay(
+            d.instrument,
+            Path(d.message),
+            Path(d.orderbook) if d.orderbook else None,
+            day_index=d.day_index,
+        )
         for d in data.lobster_days
     ]
     return read_lobster(days, tick_size=data.tick_size)
@@ -228,6 +233,7 @@ def generate_and_evaluate(
         s.one_step_samples,
         seed=s.prompt_seed,
         temperature=s.temperature,
+        device=device,
     )
     one_step = {
         "invalid_rate": float(fake.invalid.mean()),
@@ -281,10 +287,13 @@ def run_experiment(
         )
         result = trainer.fit(resume=resume)
         device = trainer.device
+        # Evaluate the best validation weights, not the (possibly overfit) last ones.
+        restored = trainer.restore_best()
         training = {
             "status": result.status,
             "step": result.step,
             "best_validation": result.best_validation,
+            "evaluated_weights": "best" if restored else "final",
         }
     else:
         atomic_write_json(run_dir / "manifest.json", {**manifest, "status": "fitted"})

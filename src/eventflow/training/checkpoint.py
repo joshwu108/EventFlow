@@ -64,9 +64,11 @@ def rng_state() -> dict[str, Any]:
 def restore_rng_state(state: dict[str, Any]) -> None:
     random.setstate(state["python"])
     np.random.set_state(state["numpy"])  # noqa: NPY002
-    torch.set_rng_state(state["torch"])
+    # Checkpoints may be loaded with map_location on an accelerator; RNG states
+    # must be CPU ByteTensors.
+    torch.set_rng_state(state["torch"].cpu())
     if "cuda" in state and torch.cuda.is_available():
-        torch.cuda.set_rng_state_all(state["cuda"])
+        torch.cuda.set_rng_state_all([s.cpu() for s in state["cuda"]])
 
 
 def save_checkpoint(path: Path, payload: dict[str, Any]) -> Path:
