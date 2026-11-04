@@ -2,7 +2,7 @@
 
 The package is organised by pipeline stage:
 
-* :mod:`eventflow.data` -- validated event frames, adapters, preprocessing.
+* :mod:`eventflow.marketdata` -- validated event frames, adapters, preprocessing.
 * :mod:`eventflow.tokenization` -- reversible mixed discrete/continuous encodings.
 * :mod:`eventflow.models` -- context encoder, output heads, generative models.
 * :mod:`eventflow.diffusion` / :mod:`eventflow.flow` -- continuous generative heads.
