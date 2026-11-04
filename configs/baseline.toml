@@ -1,0 +1,8 @@
+# Statistical autoregressive baseline: Markov chain + conditional bootstrap.
+[experiment]
+name = "baseline"
+extends = "_base.toml"
+
+[model]
+kind = "baseline"
+smoothing = 0.5

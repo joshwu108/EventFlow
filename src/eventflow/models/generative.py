@@ -99,7 +99,7 @@ class EventGenerativeModel(nn.Module):
     def _build_head(self, cond_dim: int, dim: int) -> nn.Module:
         c = self.config
         if c.continuous_head == "mdn":
-            return MixtureDensityHead(cond_dim, dim, c.mdn_components, c.head_width)
+            return MixtureDensityHead(cond_dim, dim, c.mdn_components, c.mdn_width or c.head_width)
         if c.continuous_head == "ddpm":
             return DDPMHead(cond_dim, dim, c.diffusion, c.head_width, c.head_depth, c.loss_repeats)
         return FlowMatchingHead(cond_dim, dim, c.flow, c.head_width, c.head_depth, c.loss_repeats)

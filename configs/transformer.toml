@@ -1,0 +1,11 @@
+# Causal Transformer with factorised softmax heads and a mixture-density head.
+[experiment]
+name = "transformer"
+extends = "_base.toml"
+
+[model]
+kind = "transformer"
+mdn_components = 16
+# Widened so the head budget matches the DDPM and flow heads (checked by
+# `eventflow compare --parameters`).
+mdn_width = 1536

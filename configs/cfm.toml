@@ -1,0 +1,13 @@
+# Flow matching over relaxed (+-1 one-hot) categoricals and continuous fields jointly.
+[experiment]
+name = "cfm"
+extends = "_base.toml"
+
+[model]
+kind = "cfm"
+
+[model.flow]
+sigma_min = 1e-4
+time_sampling = "uniform"
+solver = "heun"
+sample_steps = 32

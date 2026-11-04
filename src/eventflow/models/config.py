@@ -100,6 +100,7 @@ class ModelConfig:
     head_width: int = 256
     head_depth: int = 3
     mdn_components: int = 8
+    mdn_width: int | None = None  # defaults to head_width; lets MDN budgets match DDPM/flow heads
     loss_repeats: int = 4
     continuous_loss_weight: float = 1.0
     diffusion: DiffusionConfig = field(default_factory=DiffusionConfig)
@@ -136,6 +137,8 @@ class ModelConfig:
         ):
             if getattr(self, name) < 1:
                 raise ConfigError(f"model.{name} must be >= 1")
+        if self.mdn_width is not None and self.mdn_width < 1:
+            raise ConfigError("model.mdn_width must be >= 1 or null")
         if not 0 <= self.dropout < 1:
             raise ConfigError("model.dropout must lie in [0, 1)")
         if self.time_frequencies < 0:

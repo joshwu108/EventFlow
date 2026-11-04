@@ -1,0 +1,49 @@
+# Tiny CPU configuration for dry runs, CI integration tests and examples.
+# Not a research configuration.
+[experiment]
+name = "smoke"
+seed = 0
+output_dir = "runs"
+
+[data.synthetic]
+seed = 0
+sessions_per_instrument = 3
+events_per_session = 400
+
+[sequence]
+context_length = 32
+stride = 32
+
+[model]
+kind = "hybrid"
+d_model = 32
+n_layers = 2
+n_heads = 2
+d_ff = 64
+dropout = 0.0
+max_context = 32
+head_width = 32
+head_depth = 2
+loss_repeats = 2
+
+[model.flow]
+sample_steps = 4
+
+[train]
+max_steps = 4
+batch_size = 4
+warmup_steps = 1
+eval_every = 2
+eval_batches = 2
+checkpoint_every = 2
+log_every = 1
+device = "cpu"
+
+[sampling]
+num_rollouts = 4
+horizon = 64
+one_step_samples = 64
+
+[evaluation]
+lags = [1, 2, 5]
+bucket_size = 8

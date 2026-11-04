@@ -1,0 +1,76 @@
+# Shared settings for the five-way comparison. Every configs/*.toml in the
+# comparison extends this file; `eventflow compare configs/*.toml` verifies
+# that nothing affecting fairness differs.
+[experiment]
+name = "base"
+seed = 0
+output_dir = "runs"
+
+[data]
+source = "synthetic"
+
+[data.synthetic]
+seed = 0
+instruments = ["SYN_A", "SYN_B", "SYN_C"]
+sessions_per_instrument = 10
+events_per_session = 20000
+
+[preprocess]
+missing = "error"
+min_session_events = 64
+
+[split]
+train = 0.7
+validation = 0.15
+test = 0.15
+unit = "session"
+
+[tokenizer]
+max_price_ticks = 8
+price_resolution = 1.0
+
+[sequence]
+context_length = 256
+stride = 128
+
+[train]
+max_steps = 20000
+batch_size = 64
+grad_accumulation = 1
+optimizer = "adamw"
+lr = 3e-4
+weight_decay = 0.01
+scheduler = "cosine"
+warmup_steps = 1000
+grad_clip = 1.0
+precision = "bf16"
+eval_every = 1000
+eval_batches = 100
+checkpoint_every = 2000
+early_stopping_patience = 5
+device = "auto"
+num_workers = 4
+
+[sampling]
+num_rollouts = 128
+horizon = 1024
+temperature = 1.0
+one_step_samples = 4096
+prompt_seed = 0
+
+[evaluation]
+by_instrument = true
+lags = [1, 2, 5, 10, 20, 50]
+bucket_size = 50
+downstream = true
+
+[model]
+d_model = 256
+n_layers = 6
+n_heads = 8
+d_ff = 1024
+dropout = 0.1
+max_context = 256
+head_width = 384
+head_depth = 3
+loss_repeats = 4

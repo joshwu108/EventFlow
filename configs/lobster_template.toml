@@ -1,0 +1,16 @@
+# Template for LOBSTER data you have licensed and downloaded yourself.
+# Replace the paths; nothing is downloaded by EventFlow.
+[experiment]
+name = "lobster_hybrid"
+extends = "hybrid.toml"
+
+[data]
+source = "lobster"
+tick_size = 0.01
+lobster_days = [
+  { instrument = "TICKER", message = "/path/to/TICKER_DATE_34200000_57600000_message_10.csv", orderbook = "/path/to/TICKER_DATE_34200000_57600000_orderbook_10.csv" },
+]
+
+[preprocess]
+drop_event_types = ["cross_trade"]
+max_gap = 300.0

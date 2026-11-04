@@ -1,0 +1,13 @@
+# Same encoder and categorical chain; continuous fields from a conditional DDPM head.
+[experiment]
+name = "ddpm"
+extends = "_base.toml"
+
+[model]
+kind = "ddpm"
+
+[model.diffusion]
+train_steps = 1000
+schedule = "cosine"
+sample_steps = 64
+x0_clip = 6.0
