@@ -23,7 +23,8 @@ class MessageError(ValueError):
     """The commit message violates the convention; nothing was committed."""
 
 
-def _check_single_author(text: str) -> None:
+def check_single_author(text: str) -> None:
+    """Raise ``MessageError`` when any line of ``text`` carries a co-author trailer."""
     for line in text.splitlines():
         if _FORBIDDEN_TRAILERS.search(line):
             raise MessageError(
@@ -52,9 +53,9 @@ def compose_message(subject: str, body: str | None = None) -> str:
         raise MessageError("subject needs a description after the type")
     if len(subject) > MAX_SUBJECT_LENGTH:
         raise MessageError(f"subject exceeds {MAX_SUBJECT_LENGTH} characters ({len(subject)})")
-    _check_single_author(subject)
+    check_single_author(subject)
     if body is None or not body.strip():
         return subject
     body = body.strip()
-    _check_single_author(body)
+    check_single_author(body)
     return f"{subject}\n\n{body}"
