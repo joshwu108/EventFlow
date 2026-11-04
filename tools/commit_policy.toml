@@ -14,7 +14,7 @@ branch = "main"
 
 # Both must pass before a commit is created.
 test_command = [".venv/bin/python", "-m", "pytest", "-q"]
-lint_command = [".venv/bin/ruff", "check", "tools", "tests"]
+lint_command = [".venv/bin/ruff", "check", "src", "tools", "tests", "examples", "benchmarks"]
 
 # Never autonomous, regardless of the flags above.
 requires_explicit_approval = [

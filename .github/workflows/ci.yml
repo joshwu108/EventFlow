@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  cpu:
+    name: cpu tests (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: install
+        run: |
+          python -m pip install --upgrade pip
+          # CPU-only wheel: CI never needs CUDA, and the CPU wheel is much smaller.
+          pip install --index-url https://download.pytorch.org/whl/cpu torch
+          pip install -e '.[dev]'
+      - name: lint
+        run: ruff check src tools tests examples benchmarks
+      - name: format check
+        run: ruff format --check src tests examples benchmarks
+      - name: test
+        run: pytest -q --cov=eventflow --cov-report=term-missing
