@@ -36,3 +36,23 @@ def repo(tmp_path: Path) -> Path:
     run_git(root, "add", ".gitignore", "README.rst")
     run_git(root, "commit", "-q", "-m", "chore: initial")
     return root
+
+
+@pytest.fixture
+def remote(repo: Path, tmp_path: Path) -> Path:
+    """A bare ``origin`` that already holds the fixture repository's ``main``."""
+    bare = tmp_path / "origin.git"
+    run_git(tmp_path, "init", "-q", "--bare", "-b", "main", str(bare))
+    run_git(repo, "remote", "add", "origin", str(bare))
+    run_git(repo, "push", "-q", "-u", "origin", "main")
+    return bare
+
+
+def clone_of(remote: Path, tmp_path: Path, name: str) -> Path:
+    """A second working clone of ``remote`` with its own local identity."""
+    other = tmp_path / name
+    run_git(tmp_path, "clone", "-q", str(remote), str(other))
+    run_git(other, "config", "--local", "user.name", "Other Person")
+    run_git(other, "config", "--local", "user.email", "other@example.invalid")
+    run_git(other, "config", "--local", "commit.gpgsign", "false")
+    return other
