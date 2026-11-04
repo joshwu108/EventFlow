@@ -1,0 +1,26 @@
+# Commit autonomy for THIS repository, granted by the maintainer. The commit
+# tooling (tools/commit_safe.py) and the generated skill both read this file;
+# tools/bootstrap_commit_skill.py regenerates the skill from it.
+
+auto_commit = true
+# Tested milestones go to origin/main without re-asking. Pushes are
+# fast-forward only; the tooling never forces.
+auto_push = true
+granted_on = "2026-11-04"
+granted_by = "joshuawu"
+
+remote = "origin"
+branch = "main"
+
+# Both must pass before a commit is created.
+test_command = [".venv/bin/python", "-m", "pytest", "-q"]
+lint_command = [".venv/bin/ruff", "check", "tools", "tests"]
+
+# Never autonomous, regardless of the flags above.
+requires_explicit_approval = [
+  "merge", "rebase", "amend", "force-push", "remote-change", "pull-request",
+  "history-rewrite",
+]
+
+# Paths that need the maintainer's explicit sign-off before they are staged.
+protected_paths = []
