@@ -10,14 +10,17 @@ mechanically, so that it does not depend on an agent remembering it:
   * runs ``git diff --check``, the lint command and the test suite
     (``--skip-tests`` is explicit and announced);
   * re-reads the index and aborts on anything outside the allowlist;
+  * with ``--push``, pushes the result fast-forward to the policy's remote
+    branch (``tools.push``), including commits still pending from earlier;
   * never merges, rebases, amends, force-pushes or changes remotes.
 
 Usage:
     python -m tools.commit_safe --message "test: add parity cases" \\
-        --path tools/x.py --path tests/test_x.py [--body ...] [--dry-run]
+        --path tools/x.py --path tests/test_x.py [--body ...] [--dry-run] [--push]
 
 The exit status is 0 after a commit, a dry run or when nothing changed, and
-1 when any check aborts. An aborted run resets the index.
+1 when any check aborts. An aborted run resets the index. A refused push
+leaves the local commit in place and says so.
 """
 
 from __future__ import annotations
@@ -31,6 +34,7 @@ from tools.gates import GateError, run_lint, run_tests, whitespace_check
 from tools.gitwrap import GitError, git, local_identity
 from tools.message import MessageError, compose_message
 from tools.policy import DEFAULT_POLICY_PATH, Policy, PolicyError, load_policy
+from tools.push import PushError, push_milestone
 from tools.staging import StagingError, reset_index, stage_allowlist, verify_staged
 
 REPO = Path(__file__).resolve().parent.parent
@@ -48,6 +52,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--dry-run", action="store_true", help="check and stage, then reset")
     parser.add_argument("--skip-tests", action="store_true", help="explicitly skip the test gate")
+    parser.add_argument(
+        "--push", action="store_true", help="push fast-forward to the policy's remote branch"
+    )
     parser.add_argument(
         "--approve-protected", action="store_true", help="maintainer approved a protected path"
     )
@@ -123,6 +130,15 @@ def main(argv: list[str] | None = None) -> int:
         )
     except CommitAborted as exc:
         print(f"ABORTED: {exc}", file=sys.stderr)
+        return 1
+    if not args.push or args.dry_run:
+        return 0
+    try:
+        print(push_milestone(args.repo, policy))
+    except PushError as exc:
+        print(
+            f"PUSH REFUSED: {exc}\nThe commit exists locally; nothing was pushed.", file=sys.stderr
+        )
         return 1
     return 0
 

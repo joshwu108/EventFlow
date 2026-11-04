@@ -152,3 +152,63 @@ def test_whitespace_errors_abort(repo: Path, capsys: pytest.CaptureFixture[str])
 
     assert status == 1
     assert "whitespace" in capsys.readouterr().err
+
+
+def write_push_policy(repo: Path) -> Path:
+    path = write_policy(repo)
+    path.write_text(path.read_text() + "auto_push = true\n")
+    return path
+
+
+def test_push_flag_pushes_the_new_commit(
+    repo: Path, remote: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    policy = write_push_policy(repo)
+    (repo / "a.py").write_text("a = 1\n")
+
+    status = run(repo, policy, "-m", "feat: add a", "--path", "a.py", "--push")
+
+    assert status == 0
+    assert run_git(remote, "rev-parse", "refs/heads/main") == run_git(repo, "rev-parse", "HEAD")
+    assert "pushed 1 commit to origin/main" in capsys.readouterr().out
+
+
+def test_push_flag_with_nothing_to_commit_still_pushes_pending_commits(
+    repo: Path, remote: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    policy = write_push_policy(repo)
+    (repo / "a.py").write_text("a = 1\n")
+    run_git(repo, "add", "a.py")
+    run_git(repo, "commit", "-q", "-m", "feat: earlier")
+
+    status = run(repo, policy, "-m", "docs: nothing", "--path", "README.rst", "--push")
+
+    assert status == 0
+    assert run_git(remote, "rev-parse", "refs/heads/main") == run_git(repo, "rev-parse", "HEAD")
+    assert "pushed 1 commit" in capsys.readouterr().out
+
+
+def test_dry_run_never_pushes(repo: Path, remote: Path) -> None:
+    policy = write_push_policy(repo)
+    (repo / "a.py").write_text("a = 1\n")
+    before = run_git(remote, "rev-parse", "refs/heads/main")
+
+    status = run(repo, policy, "-m", "feat: add a", "--path", "a.py", "--push", "--dry-run")
+
+    assert status == 0
+    assert run_git(remote, "rev-parse", "refs/heads/main") == before
+
+
+def test_refused_push_keeps_the_local_commit_and_exits_one(
+    repo: Path, remote: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    policy = write_policy(repo)  # commit grant only
+    (repo / "a.py").write_text("a = 1\n")
+
+    status = run(repo, policy, "-m", "feat: add a", "--path", "a.py", "--push")
+
+    assert status == 1
+    assert head_count(repo) == 2
+    err = capsys.readouterr().err
+    assert "no push grant" in err
+    assert "commit exists locally" in err
