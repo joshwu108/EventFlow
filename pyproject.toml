@@ -1,0 +1,28 @@
+[project]
+name = "eventflow"
+version = "0.1.0"
+description = "EventFlow research repository."
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "Joshua Wu", email = "joshwu10806@gmail.com" }]
+readme = "README.rst"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra --strict-markers"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
